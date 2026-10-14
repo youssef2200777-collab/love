@@ -16,7 +16,7 @@
   .heart-text {
     color:#fff; font-weight:900; letter-spacing:6px;
     font-size:clamp(1.6rem,5vw,4.5rem); white-space:nowrap;
-    opacity:0; transition:opacity 1.5s ease-in-out;
+    opacity:0; transition:opacity .6s ease-in-out;
     text-shadow:0 0 10px rgba(255,20,147,.9),0 0 20px rgba(255,20,147,.8),0 0 40px rgba(255,20,147,.9),0 0 80px rgba(255,0,100,1);
     animation:pulseGlow 2s infinite alternate ease-in-out;
   }
@@ -243,13 +243,13 @@ function play() {
     return startSynth().then(ok => { playing = ok; setBtn(); return ok; });
   }
 
-  // if the real song doesn't actually start within 1.5s, switch to the built-in melody
+  // if the real song doesn't actually start within 8s, switch to the built-in melody
   clearTimeout(fallbackTimer);
   fallbackTimer = setTimeout(() => {
     if (wantOn && !useSynth && (audio.paused || audio.readyState < 3)) {
       useSynth = true; audio.pause(); play();
     }
-  }, 1500);
+  }, 8000);
 
   return audio.play().then(() => { playing = true; setBtn(); return true; })
     .catch(err => {
@@ -279,13 +279,15 @@ function hideModal() { startModal.classList.add('hidden-modal'); }
 play().then(ok => { if (ok) hideModal(); });
 
 // 2) browsers block sound until the first click/tap/key, so start on that first gesture
+const gestureEvents = ['pointerdown','touchstart','touchend','keydown','click'];
+function stopListening() { gestureEvents.forEach(ev => window.removeEventListener(ev, firstGesture)); }
 function firstGesture() {
   gestureDone = true;
-  hideModal();
-  if (!playing) play();
-  ['pointerdown','touchstart','touchend','keydown','click'].forEach(ev => window.removeEventListener(ev, firstGesture));
+  if (playing) { hideModal(); stopListening(); return; }
+  // keep listening until the sound has really started (phones often reject the first try)
+  play().then(ok => { if (ok) { hideModal(); stopListening(); } });
 }
-['pointerdown','touchstart','touchend','keydown','click'].forEach(ev => window.addEventListener(ev, firstGesture));
+gestureEvents.forEach(ev => window.addEventListener(ev, firstGesture));
 
 /* ---------- main loop ---------- */
 function render() {
@@ -297,8 +299,8 @@ function render() {
   hearts.forEach(h => { h.update(); h.draw(); });
 
   if (progress < 1) {
-    progress = Math.min(1, progress + .006);
-    if (progress === 1) centerText.classList.add('visible');
+    progress = Math.min(1, progress + .012);
+    if (progress > .3) centerText.classList.add('visible');
   }
 
   pulseAngle += .035;
